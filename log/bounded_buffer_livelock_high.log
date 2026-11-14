@@ -1,0 +1,518 @@
+// ============================================================================
+// Author  : Shreyas S Bagi
+// Note    : Developed with AI assistance (IBM Bob).
+// Purpose : Created for learning and knowledge purposes only.
+// ============================================================================
+RPT_INFO @ 0 [DEMO] 
+##########################################################################
+# BOUNDED BUFFER LIVELOCK DEMO  (model of the full-buffer deadlock)
+#
+#   q    = pending queue, oldest request first. A request leaves ONLY when it completes.
+#   buf  = bounded FIFO of request ids, capacity 4.
+#   port = ONE service per cycle (service port). A service pops buf.front().
+#
+# Start state: requests 4..7 already fill buf, the oldest requests
+# 0..3 are still waiting in q. Demand is constant: whenever a request completes, a new
+# younger one enters q.
+#
+# Each cycle every request in q is visited oldest-first, in order:
+#   not in buf -> try to insert; if buf is full the insert fails, but the request may
+#                 still burn the port to pop the front ('queue-only service');
+#   in buf     -> try the port; it completes only if buf.front() is ITS OWN entry.
+##########################################################################
+RPT_INFO @ 0 [DEMO] 
+==========================================================================
+ VARIANT: BUGGY (result dropped on queue-only service)
+==========================================================================
+  Behaviour : the queue-only service pops the front, but the result is thrown away.
+  Why bad   : the owner of the popped entry is not marked done and is not in buf, so it must
+              be inserted and serviced AGAIN - and the port is burned by the oldest request every
+              cycle before the owner gets its turn.
+  Expect    : LIVELOCK - everyone keeps trying, the port is busy every cycle, 0 completions.
+  narrating the first 6 cycles:
+RPT_INFO @ 1 [BUF] ---- start of cycle: q (oldest first) = [0,1,2,3,4,5,6,7]   buf (front..back) = [4,5,6,7]   occupancy 4/4  <-- FULL
+RPT_INFO @ 1 [BUF] port = FREE (one service allowed this cycle), oldest request = 0
+RPT_INFO @ 1 [BUF]   request 0: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 1 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 1 [BUF]     -> port is free, so a queue-only service pops buf front = request 4, buf = [5,6,7]
+RPT_INFO @ 1 [BUF]        BUG: that result is DROPPED. request 4 is no longer in buf but not done either: it must be inserted AND serviced again
+RPT_INFO @ 1 [BUF]   request 1: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 1 [BUF]     -> inserted, buf = [5,6,7,1]
+RPT_INFO @ 1 [BUF]     -> port busy this cycle: BUF-STALL, request 1 stays in q
+RPT_INFO @ 1 [BUF]   request 2: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 1 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 1 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 1 [BUF]   request 3: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 1 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 1 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 1 [BUF]   request 4: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 1 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 1 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 1 [BUF]   request 5: already in buf (no duplicate push)
+RPT_INFO @ 1 [BUF]     -> port busy this cycle: BUF-STALL, request 5 stays in q
+RPT_INFO @ 1 [BUF]   request 6: already in buf (no duplicate push)
+RPT_INFO @ 1 [BUF]     -> port busy this cycle: BUF-STALL, request 6 stays in q
+RPT_INFO @ 1 [BUF]   request 7: already in buf (no duplicate push)
+RPT_INFO @ 1 [BUF]     -> port busy this cycle: BUF-STALL, request 7 stays in q
+RPT_INFO @ 1 [BUF] ---- end of cycle: completed this cycle = []  (total 0)   buf = [5,6,7,1]
+RPT_INFO @ 2 [BUF] ---- start of cycle: q (oldest first) = [0,1,2,3,4,5,6,7]   buf (front..back) = [5,6,7,1]   occupancy 4/4  <-- FULL
+RPT_INFO @ 2 [BUF] port = FREE (one service allowed this cycle), oldest request = 0
+RPT_INFO @ 2 [BUF]   request 0: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 2 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 2 [BUF]     -> port is free, so a queue-only service pops buf front = request 5, buf = [6,7,1]
+RPT_INFO @ 2 [BUF]        BUG: that result is DROPPED. request 5 is no longer in buf but not done either: it must be inserted AND serviced again
+RPT_INFO @ 2 [BUF]   request 1: already in buf (no duplicate push)
+RPT_INFO @ 2 [BUF]     -> port busy this cycle: BUF-STALL, request 1 stays in q
+RPT_INFO @ 2 [BUF]   request 2: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 2 [BUF]     -> inserted, buf = [6,7,1,2]
+RPT_INFO @ 2 [BUF]     -> port busy this cycle: BUF-STALL, request 2 stays in q
+RPT_INFO @ 2 [BUF]   request 3: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 2 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 2 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 2 [BUF]   request 4: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 2 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 2 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 2 [BUF]   request 5: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 2 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 2 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 2 [BUF]   request 6: already in buf (no duplicate push)
+RPT_INFO @ 2 [BUF]     -> port busy this cycle: BUF-STALL, request 6 stays in q
+RPT_INFO @ 2 [BUF]   request 7: already in buf (no duplicate push)
+RPT_INFO @ 2 [BUF]     -> port busy this cycle: BUF-STALL, request 7 stays in q
+RPT_INFO @ 2 [BUF] ---- end of cycle: completed this cycle = []  (total 0)   buf = [6,7,1,2]
+RPT_INFO @ 3 [BUF] ---- start of cycle: q (oldest first) = [0,1,2,3,4,5,6,7]   buf (front..back) = [6,7,1,2]   occupancy 4/4  <-- FULL
+RPT_INFO @ 3 [BUF] port = FREE (one service allowed this cycle), oldest request = 0
+RPT_INFO @ 3 [BUF]   request 0: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 3 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 3 [BUF]     -> port is free, so a queue-only service pops buf front = request 6, buf = [7,1,2]
+RPT_INFO @ 3 [BUF]        BUG: that result is DROPPED. request 6 is no longer in buf but not done either: it must be inserted AND serviced again
+RPT_INFO @ 3 [BUF]   request 1: already in buf (no duplicate push)
+RPT_INFO @ 3 [BUF]     -> port busy this cycle: BUF-STALL, request 1 stays in q
+RPT_INFO @ 3 [BUF]   request 2: already in buf (no duplicate push)
+RPT_INFO @ 3 [BUF]     -> port busy this cycle: BUF-STALL, request 2 stays in q
+RPT_INFO @ 3 [BUF]   request 3: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 3 [BUF]     -> inserted, buf = [7,1,2,3]
+RPT_INFO @ 3 [BUF]     -> port busy this cycle: BUF-STALL, request 3 stays in q
+RPT_INFO @ 3 [BUF]   request 4: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 3 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 3 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 3 [BUF]   request 5: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 3 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 3 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 3 [BUF]   request 6: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 3 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 3 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 3 [BUF]   request 7: already in buf (no duplicate push)
+RPT_INFO @ 3 [BUF]     -> port busy this cycle: BUF-STALL, request 7 stays in q
+RPT_INFO @ 3 [BUF] ---- end of cycle: completed this cycle = []  (total 0)   buf = [7,1,2,3]
+RPT_INFO @ 4 [BUF] ---- start of cycle: q (oldest first) = [0,1,2,3,4,5,6,7]   buf (front..back) = [7,1,2,3]   occupancy 4/4  <-- FULL
+RPT_INFO @ 4 [BUF] port = FREE (one service allowed this cycle), oldest request = 0
+RPT_INFO @ 4 [BUF]   request 0: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 4 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 4 [BUF]     -> port is free, so a queue-only service pops buf front = request 7, buf = [1,2,3]
+RPT_INFO @ 4 [BUF]        BUG: that result is DROPPED. request 7 is no longer in buf but not done either: it must be inserted AND serviced again
+RPT_INFO @ 4 [BUF]   request 1: already in buf (no duplicate push)
+RPT_INFO @ 4 [BUF]     -> port busy this cycle: BUF-STALL, request 1 stays in q
+RPT_INFO @ 4 [BUF]   request 2: already in buf (no duplicate push)
+RPT_INFO @ 4 [BUF]     -> port busy this cycle: BUF-STALL, request 2 stays in q
+RPT_INFO @ 4 [BUF]   request 3: already in buf (no duplicate push)
+RPT_INFO @ 4 [BUF]     -> port busy this cycle: BUF-STALL, request 3 stays in q
+RPT_INFO @ 4 [BUF]   request 4: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 4 [BUF]     -> inserted, buf = [1,2,3,4]
+RPT_INFO @ 4 [BUF]     -> port busy this cycle: BUF-STALL, request 4 stays in q
+RPT_INFO @ 4 [BUF]   request 5: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 4 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 4 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 4 [BUF]   request 6: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 4 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 4 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 4 [BUF]   request 7: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 4 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 4 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 4 [BUF] ---- end of cycle: completed this cycle = []  (total 0)   buf = [1,2,3,4]
+RPT_INFO @ 5 [BUF] ---- start of cycle: q (oldest first) = [0,1,2,3,4,5,6,7]   buf (front..back) = [1,2,3,4]   occupancy 4/4  <-- FULL
+RPT_INFO @ 5 [BUF] port = FREE (one service allowed this cycle), oldest request = 0
+RPT_INFO @ 5 [BUF]   request 0: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 5 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 5 [BUF]     -> port is free, so a queue-only service pops buf front = request 1, buf = [2,3,4]
+RPT_INFO @ 5 [BUF]        BUG: that result is DROPPED. request 1 is no longer in buf but not done either: it must be inserted AND serviced again
+RPT_INFO @ 5 [BUF]   request 1: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 5 [BUF]     -> inserted, buf = [2,3,4,1]
+RPT_INFO @ 5 [BUF]     -> port busy this cycle: BUF-STALL, request 1 stays in q
+RPT_INFO @ 5 [BUF]   request 2: already in buf (no duplicate push)
+RPT_INFO @ 5 [BUF]     -> port busy this cycle: BUF-STALL, request 2 stays in q
+RPT_INFO @ 5 [BUF]   request 3: already in buf (no duplicate push)
+RPT_INFO @ 5 [BUF]     -> port busy this cycle: BUF-STALL, request 3 stays in q
+RPT_INFO @ 5 [BUF]   request 4: already in buf (no duplicate push)
+RPT_INFO @ 5 [BUF]     -> port busy this cycle: BUF-STALL, request 4 stays in q
+RPT_INFO @ 5 [BUF]   request 5: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 5 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 5 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 5 [BUF]   request 6: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 5 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 5 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 5 [BUF]   request 7: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 5 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 5 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 5 [BUF] ---- end of cycle: completed this cycle = []  (total 0)   buf = [2,3,4,1]
+RPT_INFO @ 6 [BUF] ---- start of cycle: q (oldest first) = [0,1,2,3,4,5,6,7]   buf (front..back) = [2,3,4,1]   occupancy 4/4  <-- FULL
+RPT_INFO @ 6 [BUF] port = FREE (one service allowed this cycle), oldest request = 0
+RPT_INFO @ 6 [BUF]   request 0: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 6 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 6 [BUF]     -> port is free, so a queue-only service pops buf front = request 2, buf = [3,4,1]
+RPT_INFO @ 6 [BUF]        BUG: that result is DROPPED. request 2 is no longer in buf but not done either: it must be inserted AND serviced again
+RPT_INFO @ 6 [BUF]   request 1: already in buf (no duplicate push)
+RPT_INFO @ 6 [BUF]     -> port busy this cycle: BUF-STALL, request 1 stays in q
+RPT_INFO @ 6 [BUF]   request 2: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 6 [BUF]     -> inserted, buf = [3,4,1,2]
+RPT_INFO @ 6 [BUF]     -> port busy this cycle: BUF-STALL, request 2 stays in q
+RPT_INFO @ 6 [BUF]   request 3: already in buf (no duplicate push)
+RPT_INFO @ 6 [BUF]     -> port busy this cycle: BUF-STALL, request 3 stays in q
+RPT_INFO @ 6 [BUF]   request 4: already in buf (no duplicate push)
+RPT_INFO @ 6 [BUF]     -> port busy this cycle: BUF-STALL, request 4 stays in q
+RPT_INFO @ 6 [BUF]   request 5: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 6 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 6 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 6 [BUF]   request 6: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 6 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 6 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 6 [BUF]   request 7: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 6 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 6 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 6 [BUF] ---- end of cycle: completed this cycle = []  (total 0)   buf = [3,4,1,2]
+RPT_WARNING @ 50 [BUF] LIVELOCK suspected: no request completed for 50 consecutive cycles (buf occupancy 4/4)
+RPT_ERROR @ 200 [BUF] oldest request (id 0) never completed in 200 cycles -> oldest request blocked -> DEADLOCK  [BUGGY (result dropped on queue-only service)]
+RPT_INFO @ 200 [DEMO] RESULT after 200 cycles:
+    completed requests        : 0
+    oldest request (id 0) : NEVER completed -> in-order completion stops -> DEADLOCK
+    peak buffer occupancy : 4/4
+RPT_INFO @ 0 [DEMO] 
+==========================================================================
+ VARIANT: RESULT_KEPT (no reserved slot)
+==========================================================================
+  Behaviour : the queue-only service pops the front AND remembers the result: the owner is
+              marked ready and completes on its next visit without needing the port.
+  Why better: no work is wasted, so the system moves.
+  Remaining : right after the oldest request's failed insert, younger requests refill the freed slot
+              (they are visited later in the same pass). The oldest request never finds a free
+              slot -> HEAD STARVATION. With in-order completion the whole system stalls again.
+  Expect    : many completions, but request 0 NEVER completes.
+  narrating the first 6 cycles:
+RPT_INFO @ 1 [BUF] ---- start of cycle: q (oldest first) = [0,1,2,3,4,5,6,7]   buf (front..back) = [4,5,6,7]   occupancy 4/4  <-- FULL
+RPT_INFO @ 1 [BUF] port = FREE (one service allowed this cycle), oldest request = 0
+RPT_INFO @ 1 [BUF]   request 0: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 1 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 1 [BUF]     -> port is free, so a queue-only service pops buf front = request 4, buf = [5,6,7]
+RPT_INFO @ 1 [BUF]        result KEPT: request 4 is marked ready and completes on its next visit without the port
+RPT_INFO @ 1 [BUF]   request 1: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 1 [BUF]     -> inserted, buf = [5,6,7,1]
+RPT_INFO @ 1 [BUF]     -> port busy this cycle: BUF-STALL, request 1 stays in q
+RPT_INFO @ 1 [BUF]   request 2: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 1 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 1 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 1 [BUF]   request 3: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 1 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 1 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 1 [BUF]   request 4: result was kept from an earlier service -> completes now, needs no port
+RPT_INFO @ 1 [BUF]   request 5: already in buf (no duplicate push)
+RPT_INFO @ 1 [BUF]     -> port busy this cycle: BUF-STALL, request 5 stays in q
+RPT_INFO @ 1 [BUF]   request 6: already in buf (no duplicate push)
+RPT_INFO @ 1 [BUF]     -> port busy this cycle: BUF-STALL, request 6 stays in q
+RPT_INFO @ 1 [BUF]   request 7: already in buf (no duplicate push)
+RPT_INFO @ 1 [BUF]     -> port busy this cycle: BUF-STALL, request 7 stays in q
+RPT_INFO @ 1 [BUF] ---- end of cycle: completed this cycle = [4]  (total 1)   buf = [5,6,7,1]
+RPT_INFO @ 2 [BUF] ---- start of cycle: q (oldest first) = [0,1,2,3,5,6,7,8]   buf (front..back) = [5,6,7,1]   occupancy 4/4  <-- FULL
+RPT_INFO @ 2 [BUF] port = FREE (one service allowed this cycle), oldest request = 0
+RPT_INFO @ 2 [BUF]   request 0: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 2 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 2 [BUF]     -> port is free, so a queue-only service pops buf front = request 5, buf = [6,7,1]
+RPT_INFO @ 2 [BUF]        result KEPT: request 5 is marked ready and completes on its next visit without the port
+RPT_INFO @ 2 [BUF]   request 1: already in buf (no duplicate push)
+RPT_INFO @ 2 [BUF]     -> port busy this cycle: BUF-STALL, request 1 stays in q
+RPT_INFO @ 2 [BUF]   request 2: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 2 [BUF]     -> inserted, buf = [6,7,1,2]
+RPT_INFO @ 2 [BUF]     -> port busy this cycle: BUF-STALL, request 2 stays in q
+RPT_INFO @ 2 [BUF]   request 3: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 2 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 2 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 2 [BUF]   request 5: result was kept from an earlier service -> completes now, needs no port
+RPT_INFO @ 2 [BUF]   request 6: already in buf (no duplicate push)
+RPT_INFO @ 2 [BUF]     -> port busy this cycle: BUF-STALL, request 6 stays in q
+RPT_INFO @ 2 [BUF]   request 7: already in buf (no duplicate push)
+RPT_INFO @ 2 [BUF]     -> port busy this cycle: BUF-STALL, request 7 stays in q
+RPT_INFO @ 2 [BUF]   request 8: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 2 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 2 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 2 [BUF] ---- end of cycle: completed this cycle = [5]  (total 2)   buf = [6,7,1,2]
+RPT_INFO @ 3 [BUF] ---- start of cycle: q (oldest first) = [0,1,2,3,6,7,8,9]   buf (front..back) = [6,7,1,2]   occupancy 4/4  <-- FULL
+RPT_INFO @ 3 [BUF] port = FREE (one service allowed this cycle), oldest request = 0
+RPT_INFO @ 3 [BUF]   request 0: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 3 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 3 [BUF]     -> port is free, so a queue-only service pops buf front = request 6, buf = [7,1,2]
+RPT_INFO @ 3 [BUF]        result KEPT: request 6 is marked ready and completes on its next visit without the port
+RPT_INFO @ 3 [BUF]   request 1: already in buf (no duplicate push)
+RPT_INFO @ 3 [BUF]     -> port busy this cycle: BUF-STALL, request 1 stays in q
+RPT_INFO @ 3 [BUF]   request 2: already in buf (no duplicate push)
+RPT_INFO @ 3 [BUF]     -> port busy this cycle: BUF-STALL, request 2 stays in q
+RPT_INFO @ 3 [BUF]   request 3: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 3 [BUF]     -> inserted, buf = [7,1,2,3]
+RPT_INFO @ 3 [BUF]     -> port busy this cycle: BUF-STALL, request 3 stays in q
+RPT_INFO @ 3 [BUF]   request 6: result was kept from an earlier service -> completes now, needs no port
+RPT_INFO @ 3 [BUF]   request 7: already in buf (no duplicate push)
+RPT_INFO @ 3 [BUF]     -> port busy this cycle: BUF-STALL, request 7 stays in q
+RPT_INFO @ 3 [BUF]   request 8: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 3 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 3 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 3 [BUF]   request 9: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 3 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 3 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 3 [BUF] ---- end of cycle: completed this cycle = [6]  (total 3)   buf = [7,1,2,3]
+RPT_INFO @ 4 [BUF] ---- start of cycle: q (oldest first) = [0,1,2,3,7,8,9,10]   buf (front..back) = [7,1,2,3]   occupancy 4/4  <-- FULL
+RPT_INFO @ 4 [BUF] port = FREE (one service allowed this cycle), oldest request = 0
+RPT_INFO @ 4 [BUF]   request 0: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 4 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 4 [BUF]     -> port is free, so a queue-only service pops buf front = request 7, buf = [1,2,3]
+RPT_INFO @ 4 [BUF]        result KEPT: request 7 is marked ready and completes on its next visit without the port
+RPT_INFO @ 4 [BUF]   request 1: already in buf (no duplicate push)
+RPT_INFO @ 4 [BUF]     -> port busy this cycle: BUF-STALL, request 1 stays in q
+RPT_INFO @ 4 [BUF]   request 2: already in buf (no duplicate push)
+RPT_INFO @ 4 [BUF]     -> port busy this cycle: BUF-STALL, request 2 stays in q
+RPT_INFO @ 4 [BUF]   request 3: already in buf (no duplicate push)
+RPT_INFO @ 4 [BUF]     -> port busy this cycle: BUF-STALL, request 3 stays in q
+RPT_INFO @ 4 [BUF]   request 7: result was kept from an earlier service -> completes now, needs no port
+RPT_INFO @ 4 [BUF]   request 8: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 4 [BUF]     -> inserted, buf = [1,2,3,8]
+RPT_INFO @ 4 [BUF]     -> port busy this cycle: BUF-STALL, request 8 stays in q
+RPT_INFO @ 4 [BUF]   request 9: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 4 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 4 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 4 [BUF]   request 10: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 4 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 4 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 4 [BUF] ---- end of cycle: completed this cycle = [7]  (total 4)   buf = [1,2,3,8]
+RPT_INFO @ 5 [BUF] ---- start of cycle: q (oldest first) = [0,1,2,3,8,9,10,11]   buf (front..back) = [1,2,3,8]   occupancy 4/4  <-- FULL
+RPT_INFO @ 5 [BUF] port = FREE (one service allowed this cycle), oldest request = 0
+RPT_INFO @ 5 [BUF]   request 0: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 5 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 5 [BUF]     -> port is free, so a queue-only service pops buf front = request 1, buf = [2,3,8]
+RPT_INFO @ 5 [BUF]        result KEPT: request 1 is marked ready and completes on its next visit without the port
+RPT_INFO @ 5 [BUF]   request 1: result was kept from an earlier service -> completes now, needs no port
+RPT_INFO @ 5 [BUF]   request 2: already in buf (no duplicate push)
+RPT_INFO @ 5 [BUF]     -> port busy this cycle: BUF-STALL, request 2 stays in q
+RPT_INFO @ 5 [BUF]   request 3: already in buf (no duplicate push)
+RPT_INFO @ 5 [BUF]     -> port busy this cycle: BUF-STALL, request 3 stays in q
+RPT_INFO @ 5 [BUF]   request 8: already in buf (no duplicate push)
+RPT_INFO @ 5 [BUF]     -> port busy this cycle: BUF-STALL, request 8 stays in q
+RPT_INFO @ 5 [BUF]   request 9: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 5 [BUF]     -> inserted, buf = [2,3,8,9]
+RPT_INFO @ 5 [BUF]     -> port busy this cycle: BUF-STALL, request 9 stays in q
+RPT_INFO @ 5 [BUF]   request 10: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 5 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 5 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 5 [BUF]   request 11: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 5 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 5 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 5 [BUF] ---- end of cycle: completed this cycle = [1]  (total 5)   buf = [2,3,8,9]
+RPT_INFO @ 6 [BUF] ---- start of cycle: q (oldest first) = [0,2,3,8,9,10,11,12]   buf (front..back) = [2,3,8,9]   occupancy 4/4  <-- FULL
+RPT_INFO @ 6 [BUF] port = FREE (one service allowed this cycle), oldest request = 0
+RPT_INFO @ 6 [BUF]   request 0: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 6 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 6 [BUF]     -> port is free, so a queue-only service pops buf front = request 2, buf = [3,8,9]
+RPT_INFO @ 6 [BUF]        result KEPT: request 2 is marked ready and completes on its next visit without the port
+RPT_INFO @ 6 [BUF]   request 2: result was kept from an earlier service -> completes now, needs no port
+RPT_INFO @ 6 [BUF]   request 3: already in buf (no duplicate push)
+RPT_INFO @ 6 [BUF]     -> port busy this cycle: BUF-STALL, request 3 stays in q
+RPT_INFO @ 6 [BUF]   request 8: already in buf (no duplicate push)
+RPT_INFO @ 6 [BUF]     -> port busy this cycle: BUF-STALL, request 8 stays in q
+RPT_INFO @ 6 [BUF]   request 9: already in buf (no duplicate push)
+RPT_INFO @ 6 [BUF]     -> port busy this cycle: BUF-STALL, request 9 stays in q
+RPT_INFO @ 6 [BUF]   request 10: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 6 [BUF]     -> inserted, buf = [3,8,9,10]
+RPT_INFO @ 6 [BUF]     -> port busy this cycle: BUF-STALL, request 10 stays in q
+RPT_INFO @ 6 [BUF]   request 11: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 6 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 6 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 6 [BUF]   request 12: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 6 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 6 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 6 [BUF] ---- end of cycle: completed this cycle = [2]  (total 6)   buf = [3,8,9,10]
+RPT_ERROR @ 200 [BUF] oldest request (id 0) never completed in 200 cycles -> oldest request blocked -> DEADLOCK  [RESULT_KEPT (no reserved slot)]
+RPT_INFO @ 200 [DEMO] RESULT after 200 cycles:
+    completed requests        : 200
+    oldest request (id 0) : NEVER completed -> in-order completion stops -> DEADLOCK
+    peak buffer occupancy : 4/4
+RPT_INFO @ 0 [DEMO] 
+==========================================================================
+ VARIANT: RESERVED_SLOT (fix)
+==========================================================================
+  Behaviour : result kept (as above) PLUS one slot is reserved for the oldest request. Every other
+              request may fill the buffer only up to capacity-1.
+  Why it works: the oldest request always has a free slot to enter, so it can never be starved by
+              younger requests; once it is in buf it is serviced in FIFO order.
+  Expect    : request 0 completes within a few cycles, then ~1 completion per cycle (1 port).
+  narrating the first 6 cycles:
+RPT_INFO @ 1 [BUF] ---- start of cycle: q (oldest first) = [0,1,2,3,4,5,6,7]   buf (front..back) = [4,5,6,7]   occupancy 4/4  <-- FULL
+RPT_INFO @ 1 [BUF] port = FREE (one service allowed this cycle), oldest request = 0
+RPT_INFO @ 1 [BUF]   request 0: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 1 [BUF]     -> insert FAILED (buf 4 >= 4): request stays in q and rebids next cycle
+RPT_INFO @ 1 [BUF]     -> port is free, so a queue-only service pops buf front = request 4, buf = [5,6,7]
+RPT_INFO @ 1 [BUF]        result KEPT: request 4 is marked ready and completes on its next visit without the port
+RPT_INFO @ 1 [BUF]   request 1: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 1 [BUF]     -> insert FAILED (buf 3 >= 3): request stays in q and rebids next cycle
+RPT_INFO @ 1 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 1 [BUF]   request 2: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 1 [BUF]     -> insert FAILED (buf 3 >= 3): request stays in q and rebids next cycle
+RPT_INFO @ 1 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 1 [BUF]   request 3: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 1 [BUF]     -> insert FAILED (buf 3 >= 3): request stays in q and rebids next cycle
+RPT_INFO @ 1 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 1 [BUF]   request 4: result was kept from an earlier service -> completes now, needs no port
+RPT_INFO @ 1 [BUF]   request 5: already in buf (no duplicate push)
+RPT_INFO @ 1 [BUF]     -> port busy this cycle: BUF-STALL, request 5 stays in q
+RPT_INFO @ 1 [BUF]   request 6: already in buf (no duplicate push)
+RPT_INFO @ 1 [BUF]     -> port busy this cycle: BUF-STALL, request 6 stays in q
+RPT_INFO @ 1 [BUF]   request 7: already in buf (no duplicate push)
+RPT_INFO @ 1 [BUF]     -> port busy this cycle: BUF-STALL, request 7 stays in q
+RPT_INFO @ 1 [BUF] ---- end of cycle: completed this cycle = [4]  (total 1)   buf = [5,6,7]
+RPT_INFO @ 2 [BUF] ---- start of cycle: q (oldest first) = [0,1,2,3,5,6,7,8]   buf (front..back) = [5,6,7]   occupancy 3/4
+RPT_INFO @ 2 [BUF] port = FREE (one service allowed this cycle), oldest request = 0
+RPT_INFO @ 2 [BUF]   request 0: not in buf, tries to insert (allowed fill for this request: 4/4)
+RPT_INFO @ 2 [BUF]     -> inserted, buf = [5,6,7,0]
+RPT_INFO @ 2 [BUF]     -> port free: service buf front = request 5, buf = [6,7,0]
+RPT_INFO @ 2 [BUF]        front belongs to request 5, not me -> request 0 stays in q
+RPT_INFO @ 2 [BUF]   request 1: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 2 [BUF]     -> insert FAILED (buf 3 >= 3): request stays in q and rebids next cycle
+RPT_INFO @ 2 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 2 [BUF]   request 2: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 2 [BUF]     -> insert FAILED (buf 3 >= 3): request stays in q and rebids next cycle
+RPT_INFO @ 2 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 2 [BUF]   request 3: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 2 [BUF]     -> insert FAILED (buf 3 >= 3): request stays in q and rebids next cycle
+RPT_INFO @ 2 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 2 [BUF]   request 5: result was kept from an earlier service -> completes now, needs no port
+RPT_INFO @ 2 [BUF]   request 6: already in buf (no duplicate push)
+RPT_INFO @ 2 [BUF]     -> port busy this cycle: BUF-STALL, request 6 stays in q
+RPT_INFO @ 2 [BUF]   request 7: already in buf (no duplicate push)
+RPT_INFO @ 2 [BUF]     -> port busy this cycle: BUF-STALL, request 7 stays in q
+RPT_INFO @ 2 [BUF]   request 8: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 2 [BUF]     -> insert FAILED (buf 3 >= 3): request stays in q and rebids next cycle
+RPT_INFO @ 2 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 2 [BUF] ---- end of cycle: completed this cycle = [5]  (total 2)   buf = [6,7,0]
+RPT_INFO @ 3 [BUF] ---- start of cycle: q (oldest first) = [0,1,2,3,6,7,8,9]   buf (front..back) = [6,7,0]   occupancy 3/4
+RPT_INFO @ 3 [BUF] port = FREE (one service allowed this cycle), oldest request = 0
+RPT_INFO @ 3 [BUF]   request 0: already in buf (no duplicate push)
+RPT_INFO @ 3 [BUF]     -> port free: service buf front = request 6, buf = [7,0]
+RPT_INFO @ 3 [BUF]        front belongs to request 6, not me -> request 0 stays in q
+RPT_INFO @ 3 [BUF]   request 1: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 3 [BUF]     -> inserted, buf = [7,0,1]
+RPT_INFO @ 3 [BUF]     -> port busy this cycle: BUF-STALL, request 1 stays in q
+RPT_INFO @ 3 [BUF]   request 2: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 3 [BUF]     -> insert FAILED (buf 3 >= 3): request stays in q and rebids next cycle
+RPT_INFO @ 3 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 3 [BUF]   request 3: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 3 [BUF]     -> insert FAILED (buf 3 >= 3): request stays in q and rebids next cycle
+RPT_INFO @ 3 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 3 [BUF]   request 6: result was kept from an earlier service -> completes now, needs no port
+RPT_INFO @ 3 [BUF]   request 7: already in buf (no duplicate push)
+RPT_INFO @ 3 [BUF]     -> port busy this cycle: BUF-STALL, request 7 stays in q
+RPT_INFO @ 3 [BUF]   request 8: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 3 [BUF]     -> insert FAILED (buf 3 >= 3): request stays in q and rebids next cycle
+RPT_INFO @ 3 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 3 [BUF]   request 9: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 3 [BUF]     -> insert FAILED (buf 3 >= 3): request stays in q and rebids next cycle
+RPT_INFO @ 3 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 3 [BUF] ---- end of cycle: completed this cycle = [6]  (total 3)   buf = [7,0,1]
+RPT_INFO @ 4 [BUF] ---- start of cycle: q (oldest first) = [0,1,2,3,7,8,9,10]   buf (front..back) = [7,0,1]   occupancy 3/4
+RPT_INFO @ 4 [BUF] port = FREE (one service allowed this cycle), oldest request = 0
+RPT_INFO @ 4 [BUF]   request 0: already in buf (no duplicate push)
+RPT_INFO @ 4 [BUF]     -> port free: service buf front = request 7, buf = [0,1]
+RPT_INFO @ 4 [BUF]        front belongs to request 7, not me -> request 0 stays in q
+RPT_INFO @ 4 [BUF]   request 1: already in buf (no duplicate push)
+RPT_INFO @ 4 [BUF]     -> port busy this cycle: BUF-STALL, request 1 stays in q
+RPT_INFO @ 4 [BUF]   request 2: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 4 [BUF]     -> inserted, buf = [0,1,2]
+RPT_INFO @ 4 [BUF]     -> port busy this cycle: BUF-STALL, request 2 stays in q
+RPT_INFO @ 4 [BUF]   request 3: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 4 [BUF]     -> insert FAILED (buf 3 >= 3): request stays in q and rebids next cycle
+RPT_INFO @ 4 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 4 [BUF]   request 7: result was kept from an earlier service -> completes now, needs no port
+RPT_INFO @ 4 [BUF]   request 8: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 4 [BUF]     -> insert FAILED (buf 3 >= 3): request stays in q and rebids next cycle
+RPT_INFO @ 4 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 4 [BUF]   request 9: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 4 [BUF]     -> insert FAILED (buf 3 >= 3): request stays in q and rebids next cycle
+RPT_INFO @ 4 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 4 [BUF]   request 10: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 4 [BUF]     -> insert FAILED (buf 3 >= 3): request stays in q and rebids next cycle
+RPT_INFO @ 4 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 4 [BUF] ---- end of cycle: completed this cycle = [7]  (total 4)   buf = [0,1,2]
+RPT_INFO @ 5 [BUF] ---- start of cycle: q (oldest first) = [0,1,2,3,8,9,10,11]   buf (front..back) = [0,1,2]   occupancy 3/4
+RPT_INFO @ 5 [BUF] port = FREE (one service allowed this cycle), oldest request = 0
+RPT_INFO @ 5 [BUF]   request 0: already in buf (no duplicate push)
+RPT_INFO @ 5 [BUF]     -> port free: service buf front = request 0, buf = [1,2]
+RPT_INFO @ 5 [BUF]        front was MY entry -> request 0 completes and leaves q
+RPT_INFO @ 5 [BUF]   request 1: already in buf (no duplicate push)
+RPT_INFO @ 5 [BUF]     -> port busy this cycle: BUF-STALL, request 1 stays in q
+RPT_INFO @ 5 [BUF]   request 2: already in buf (no duplicate push)
+RPT_INFO @ 5 [BUF]     -> port busy this cycle: BUF-STALL, request 2 stays in q
+RPT_INFO @ 5 [BUF]   request 3: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 5 [BUF]     -> inserted, buf = [1,2,3]
+RPT_INFO @ 5 [BUF]     -> port busy this cycle: BUF-STALL, request 3 stays in q
+RPT_INFO @ 5 [BUF]   request 8: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 5 [BUF]     -> insert FAILED (buf 3 >= 3): request stays in q and rebids next cycle
+RPT_INFO @ 5 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 5 [BUF]   request 9: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 5 [BUF]     -> insert FAILED (buf 3 >= 3): request stays in q and rebids next cycle
+RPT_INFO @ 5 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 5 [BUF]   request 10: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 5 [BUF]     -> insert FAILED (buf 3 >= 3): request stays in q and rebids next cycle
+RPT_INFO @ 5 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 5 [BUF]   request 11: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 5 [BUF]     -> insert FAILED (buf 3 >= 3): request stays in q and rebids next cycle
+RPT_INFO @ 5 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 5 [BUF] ---- end of cycle: completed this cycle = [0]  (total 5)   buf = [1,2,3]
+RPT_INFO @ 6 [BUF] ---- start of cycle: q (oldest first) = [1,2,3,8,9,10,11,12]   buf (front..back) = [1,2,3]   occupancy 3/4
+RPT_INFO @ 6 [BUF] port = FREE (one service allowed this cycle), oldest request = 1
+RPT_INFO @ 6 [BUF]   request 1: already in buf (no duplicate push)
+RPT_INFO @ 6 [BUF]     -> port free: service buf front = request 1, buf = [2,3]
+RPT_INFO @ 6 [BUF]        front was MY entry -> request 1 completes and leaves q
+RPT_INFO @ 6 [BUF]   request 2: already in buf (no duplicate push)
+RPT_INFO @ 6 [BUF]     -> port busy this cycle: BUF-STALL, request 2 stays in q
+RPT_INFO @ 6 [BUF]   request 3: already in buf (no duplicate push)
+RPT_INFO @ 6 [BUF]     -> port busy this cycle: BUF-STALL, request 3 stays in q
+RPT_INFO @ 6 [BUF]   request 8: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 6 [BUF]     -> inserted, buf = [2,3,8]
+RPT_INFO @ 6 [BUF]     -> port busy this cycle: BUF-STALL, request 8 stays in q
+RPT_INFO @ 6 [BUF]   request 9: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 6 [BUF]     -> insert FAILED (buf 3 >= 3): request stays in q and rebids next cycle
+RPT_INFO @ 6 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 6 [BUF]   request 10: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 6 [BUF]     -> insert FAILED (buf 3 >= 3): request stays in q and rebids next cycle
+RPT_INFO @ 6 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 6 [BUF]   request 11: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 6 [BUF]     -> insert FAILED (buf 3 >= 3): request stays in q and rebids next cycle
+RPT_INFO @ 6 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 6 [BUF]   request 12: not in buf, tries to insert (allowed fill for this request: 3/4, last slot is RESERVED for the oldest request)
+RPT_INFO @ 6 [BUF]     -> insert FAILED (buf 3 >= 3): request stays in q and rebids next cycle
+RPT_INFO @ 6 [BUF]     -> port already used this cycle, nothing more for this request
+RPT_INFO @ 6 [BUF] ---- end of cycle: completed this cycle = [1]  (total 6)   buf = [2,3,8]
+RPT_INFO @ 200 [DEMO] RESULT after 200 cycles:
+    completed requests        : 200
+    oldest request (id 0) : completed at cycle 5
+    peak buffer occupancy : 4/4
+RPT_INFO @ 200 [DEMO] 
+TAKEAWAY
+  LIVELOCK  : everybody is busy, nothing completes (work is done and thrown away).
+  STARVATION: the resource works, others progress, but the oldest requester never gets in.
+  FIX       : never waste a service (keep the result) AND guarantee the oldest requester
+              a slot (reserve one), so progress is guaranteed from the head of the queue.
+
+--- RPT Report Summary ---
+** Report counts by severity
+RPT_INFO     : 441
+RPT_WARNING  : 1
+RPT_ERROR    : 2
+RPT_FATAL    : 0
+** Report counts by id
+[BUF]       436
+[DEMO]      8

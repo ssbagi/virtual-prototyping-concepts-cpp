@@ -1,0 +1,45 @@
+// ============================================================================
+// Author  : Shreyas S Bagi
+// Note    : Developed with AI assistance (IBM Bob).
+// Purpose : Created for learning and knowledge purposes only.
+// ============================================================================
+RPT_INFO @ 1 [TEST] [ OK ] arbiter: fixed priority starves all but requester 0
+RPT_INFO @ 2 [TEST] [ OK ] arbiter: round-robin exactly fair (divisible cycles)
+RPT_INFO @ 3 [TEST] [ OK ] arbiter: round-robin within one grant (other cycles)
+RPT_INFO @ 4 [TEST] [ OK ] arbiter: aging serves everyone, wait is bounded
+RPT_INFO @ 5 [TEST] [ OK ] arbiter: aging with huge limit == fixed
+RPT_INFO @ 6 [TEST] [ OK ] arbiter: exactly one grant per cycle (all policies)
+RPT_INFO @ 7 [TEST] [ OK ] arbiter: single requester always served
+RPT_INFO @ 8 [TEST] [ OK ] buffer : BUGGY livelocks (0 completions)
+RPT_INFO @ 9 [TEST] [ OK ] buffer : RESULT_KEPT progresses but oldest starves
+RPT_INFO @ 10 [TEST] [ OK ] buffer : RESERVED_SLOT fixes it
+RPT_INFO @ 11 [TEST] [ OK ] buffer : RESERVED_SLOT fix holds for other sizes
+RPT_INFO @ 12 [TEST] [ OK ] buffer : BUGGY livelocks for other sizes
+RPT_INFO @ 13 [TEST] [ OK ] buffer : no livelock when buffer is not full
+RPT_INFO @ 14 [TEST] [ OK ] buffer : occupancy never exceeds capacity
+RPT_INFO @ 15 [TEST] [ OK ] buffer : completions bounded by the single port
+RPT_INFO @ 16 [TEST] [ OK ] logger : default V_MEDIUM filters higher levels
+RPT_INFO @ 17 [TEST] [ OK ] logger : message format severity/time/id
+RPT_INFO @ 18 [TEST] [ OK ] logger : warning/error never filtered, counted
+RPT_INFO @ 19 [TEST] [ OK ] logger : fatal prints, counts and throws
+RPT_INFO @ 20 [TEST] [ OK ] logger : per-id verbosity overrides global
+RPT_INFO @ 21 [TEST] [ OK ] logger : trace window limits messages above V_LOW
+RPT_INFO @ 22 [TEST] [ OK ] logger : filtered message is not evaluated
+RPT_INFO @ 23 [TEST] [ OK ] logger : summary lists severity and id counts
+RPT_INFO @ 24 [TEST] [ OK ] report : arbiter flags each starved requester
+RPT_INFO @ 25 [TEST] [ OK ] report : arbiter quiet for fair policies
+RPT_INFO @ 26 [TEST] [ OK ] report : buggy buffer -> livelock warning + deadlock err
+RPT_INFO @ 27 [TEST] [ OK ] report : fixed buffer -> no warning, no error
+RPT_INFO @ 28 [TEST] [ OK ] report : narration only at high verbosity
+RPT_INFO @ 29 [TEST] [ OK ] backpressure: none -> overflow, data loss
+RPT_INFO @ 30 [TEST] [ OK ] backpressure: ready/valid lossless, consumer busy
+RPT_INFO @ 31 [TEST] [ OK ] backpressure: late stall still overflows
+RPT_INFO @ 32 [TEST] [ OK ] backpressure: watermark headroom is lossless
+RPT_INFO @ 33 [TEST] [ OK ] backpressure: watermark without headroom overflows
+RPT_INFO @ 34 [TEST] [ OK ] backpressure: credits never overflow
+RPT_INFO @ 35 [TEST] [ OK ] backpressure: full credits keep consumer busy
+RPT_INFO @ 36 [TEST] [ OK ] backpressure: too few credits starve the consumer
+RPT_INFO @ 37 [TEST] [ OK ] backpressure: items are conserved
+RPT_INFO @ 38 [TEST] [ OK ] report : backpressure error only on data loss
+RPT_INFO @ 39 [TEST] [ OK ] report : backpressure warns about bubbles
+RPT_INFO @ 39 [TEST] 39 tests, 166 checks, 0 failed checks

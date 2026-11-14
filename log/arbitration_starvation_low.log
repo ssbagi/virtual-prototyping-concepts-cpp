@@ -1,0 +1,77 @@
+// ============================================================================
+// Author  : Shreyas S Bagi
+// Note    : Developed with AI assistance (IBM Bob).
+// Purpose : Created for learning and knowledge purposes only.
+// ============================================================================
+RPT_INFO @ 0 [DEMO] 
+##########################################################################
+# ARBITRATION STARVATION DEMO
+#
+# Setup: 4 requesters ALL ask for ONE shared resource EVERY cycle.
+# The resource has a single port, so exactly one request is granted per cycle.
+#
+# STARVATION = the resource works and others keep getting it, but one requester
+# never does. 'max_wait' == total cycles means 'never granted at all'.
+##########################################################################
+RPT_INFO @ 0 [DEMO] 
+==========================================================================
+ POLICY: FIXED priority (req 0 always wins)
+==========================================================================
+  Rule : the lowest index always wins.
+  Risk : requester 0 asks every cycle, so requesters 1..3 are never even looked at.
+         This is what 'a high-priority requester always wins' does to everyone else when
+         that requester bids every cycle.
+RPT_INFO @ 0 [DEMO] narrating the first 12 cycles (waits = cycles since last grant)
+RPT_WARNING @ 100 [ARB] requester 1 has now waited 100 cycles without a grant: STARVATION suspected
+RPT_WARNING @ 100 [ARB] requester 2 has now waited 100 cycles without a grant: STARVATION suspected
+RPT_WARNING @ 100 [ARB] requester 3 has now waited 100 cycles without a grant: STARVATION suspected
+RPT_ERROR @ 1000 [ARB] requester 1 was NEVER granted in 1000 cycles: STARVED
+RPT_ERROR @ 1000 [ARB] requester 2 was NEVER granted in 1000 cycles: STARVED
+RPT_ERROR @ 1000 [ARB] requester 3 was NEVER granted in 1000 cycles: STARVED
+RPT_INFO @ 1000 [DEMO] RESULT after 1000 cycles (4 requesters, 1 grant/cycle):
+RPT_INFO @ 1000 [DEMO]   requester 0: served=1000 max_wait=0   ok
+RPT_INFO @ 1000 [DEMO]   requester 1: served=0 max_wait=1000   <-- STARVED (never granted)
+RPT_INFO @ 1000 [DEMO]   requester 2: served=0 max_wait=1000   <-- STARVED (never granted)
+RPT_INFO @ 1000 [DEMO]   requester 3: served=0 max_wait=1000   <-- STARVED (never granted)
+RPT_INFO @ 0 [DEMO] 
+==========================================================================
+ POLICY: ROUND-ROBIN
+==========================================================================
+  Rule : a pointer rotates over the requesters, each gets its turn.
+  Gain : perfectly fair, the wait is bounded by (requesters - 1) cycles.
+  Cost : no priority at all - an urgent requester (e.g. the oldest request) waits like the rest.
+RPT_INFO @ 0 [DEMO] narrating the first 12 cycles (waits = cycles since last grant)
+RPT_INFO @ 1000 [DEMO] RESULT after 1000 cycles (4 requesters, 1 grant/cycle):
+RPT_INFO @ 1000 [DEMO]   requester 0: served=250 max_wait=3   ok
+RPT_INFO @ 1000 [DEMO]   requester 1: served=250 max_wait=3   ok
+RPT_INFO @ 1000 [DEMO]   requester 2: served=250 max_wait=3   ok
+RPT_INFO @ 1000 [DEMO]   requester 3: served=250 max_wait=3   ok
+RPT_INFO @ 0 [DEMO] 
+==========================================================================
+ POLICY: FIXED + AGING
+==========================================================================
+  Rule : fixed priority, BUT a requester that has waited >= the age limit (8 cycles) is
+         promoted ahead of the fixed order (longest waiter first).
+  Gain : priority is kept (requester 0 still gets the most grants) and nobody starves:
+         the wait is bounded by roughly (age limit + requesters).
+  Watch: from cycle 9 on, requesters 1..3 age out one after another and get their grants.
+RPT_INFO @ 0 [DEMO] narrating the first 12 cycles (waits = cycles since last grant)
+RPT_INFO @ 1000 [DEMO] RESULT after 1000 cycles (4 requesters, 1 grant/cycle):
+RPT_INFO @ 1000 [DEMO]   requester 0: served=668 max_wait=3   ok
+RPT_INFO @ 1000 [DEMO]   requester 1: served=111 max_wait=8   ok
+RPT_INFO @ 1000 [DEMO]   requester 2: served=111 max_wait=9   ok
+RPT_INFO @ 1000 [DEMO]   requester 3: served=110 max_wait=10   ok
+RPT_INFO @ 1000 [DEMO] 
+TAKEAWAY: starvation is a property of the SELECTION RULE, not of the resource.
+A rule that can pick the same winner forever (fixed priority) starves the rest;
+round-robin or aging puts an upper bound on how long anyone waits.
+
+--- RPT Report Summary ---
+** Report counts by severity
+RPT_INFO     : 23
+RPT_WARNING  : 3
+RPT_ERROR    : 3
+RPT_FATAL    : 0
+** Report counts by id
+[ARB]       6
+[DEMO]      23

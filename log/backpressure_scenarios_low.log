@@ -1,0 +1,144 @@
+// ============================================================================
+// Author  : Shreyas S Bagi
+// Note    : Developed with AI assistance (IBM Bob).
+// Purpose : Created for learning and knowledge purposes only.
+// ============================================================================
+RPT_INFO @ 0 [DEMO] 
+##########################################################################
+# BACKPRESSURE SCENARIOS DEMO
+#
+# Setup: a producer has data EVERY cycle. It feeds a FIFO of 8 entries. The
+# consumer drains ONE item every 4 cycles, so the producer is 4x faster and the
+# FIFO fills up. Flow-control information needs 3 cycles to reach the producer.
+#
+# BACKPRESSURE = the downstream side slowing the upstream side so nothing is lost and
+# nothing overflows. The best possible result is 100% consumer utilisation, 0 drops.
+##########################################################################
+RPT_INFO @ 0 [DEMO] 
+==========================================================================
+ SCENARIO: NO BACKPRESSURE (producer ignores a full FIFO)
+==========================================================================
+  Rule : the producer ignores the FIFO state and sends every cycle.
+  Risk : once the FIFO is full every further item is thrown away.
+  Expect: most sent items are DROPPED; the consumer stays busy.
+  narrating the first 16 cycles:
+RPT_WARNING @ 11 [BP] FIFO overflow: first item lost (occupancy 8/8)
+RPT_ERROR @ 200 [BP] 142 of 200 items were LOST (FIFO overflow)  [NO BACKPRESSURE (producer ignores a full FIFO)]
+RPT_INFO @ 200 [DEMO] RESULT after 200 cycles:
+    items sent            : 200
+    items accepted        : 58
+    items DROPPED (lost)  : 142   <-- DATA LOSS
+    items consumed        : 50 of 50 consumer slots (100% utilisation)
+    producer stall cycles : 0
+    consumer idle slots   : 0   ok
+    peak FIFO occupancy   : 8/8
+RPT_INFO @ 0 [DEMO] 
+==========================================================================
+ SCENARIO: READY/VALID (immediate full indication)
+==========================================================================
+  Rule : the producer sends only when the FIFO has space THIS cycle.
+  Gain : lossless, the simplest form of backpressure.
+  Cost : needs a combinational full/ready path from the consumer side to the producer,
+         which is not always possible over a long or pipelined link.
+  Expect: 0 drops, consumer 100% busy, the producer is stalled most cycles.
+  narrating the first 16 cycles:
+RPT_INFO @ 200 [DEMO] RESULT after 200 cycles:
+    items sent            : 58
+    items accepted        : 58
+    items DROPPED (lost)  : 0   ok
+    items consumed        : 50 of 50 consumer slots (100% utilisation)
+    producer stall cycles : 142
+    consumer idle slots   : 0   ok
+    peak FIFO occupancy   : 8/8
+RPT_INFO @ 0 [DEMO] 
+==========================================================================
+ SCENARIO: DELAYED STALL (flag raised only when full)
+==========================================================================
+  Rule : a stall flag is raised only when the FIFO is FULL, and it takes 3 cycles to reach
+         the producer.
+  Risk : during those cycles the producer keeps sending into a FIFO that has no room left.
+         Backpressure exists, but it is too late.
+  Expect: fewer drops than 'none', but still DATA LOSS.
+  narrating the first 16 cycles:
+RPT_WARNING @ 11 [BP] FIFO overflow: first item lost (occupancy 8/8)
+RPT_ERROR @ 200 [BP] 24 of 81 items were LOST (FIFO overflow)  [DELAYED STALL (flag raised only when full)]
+RPT_INFO @ 200 [DEMO] RESULT after 200 cycles:
+    items sent            : 81
+    items accepted        : 57
+    items DROPPED (lost)  : 24   <-- DATA LOSS
+    items consumed        : 50 of 50 consumer slots (100% utilisation)
+    producer stall cycles : 119
+    consumer idle slots   : 0   ok
+    peak FIFO occupancy   : 8/8
+RPT_INFO @ 0 [DEMO] 
+==========================================================================
+ SCENARIO: WATERMARK (early stall with headroom + hysteresis)
+==========================================================================
+  Rule : the same 3-cycle flag, but raised EARLY at a high watermark (capacity - latency)
+         and released at a low watermark (half of the high one).
+  Why it works: the free entries above the high watermark absorb the items that are still
+         in flight; the gap between the two marks avoids flag chatter (hysteresis) and keeps
+         enough items queued for the consumer while the release travels back.
+  Expect: 0 drops, consumer 100% busy, peak occupancy below capacity.
+  narrating the first 16 cycles:
+RPT_INFO @ 200 [DEMO] RESULT after 200 cycles:
+    items sent            : 56
+    items accepted        : 56
+    items DROPPED (lost)  : 0   ok
+    items consumed        : 50 of 50 consumer slots (100% utilisation)
+    producer stall cycles : 144
+    consumer idle slots   : 0   ok
+    peak FIFO occupancy   : 6/8
+RPT_INFO @ 0 [DEMO] 
+==========================================================================
+ SCENARIO: CREDIT-BASED (credits = capacity)
+==========================================================================
+  Rule : the producer owns one credit per FIFO entry. Sending costs a credit, each consumer
+         pop returns one 3 cycles later. The FIFO can never overflow.
+  Gain : lossless by construction, works over any link latency.
+  Expect: 0 drops, consumer 100% busy.
+  narrating the first 16 cycles:
+RPT_INFO @ 200 [DEMO] RESULT after 200 cycles:
+    items sent            : 57
+    items accepted        : 57
+    items DROPPED (lost)  : 0   ok
+    items consumed        : 50 of 50 consumer slots (100% utilisation)
+    producer stall cycles : 143
+    consumer idle slots   : 0   ok
+    peak FIFO occupancy   : 8/8
+RPT_INFO @ 0 [DEMO] 
+==========================================================================
+ SCENARIO: CREDIT-BASED (under-provisioned: 1 credit, 6-cycle return)
+==========================================================================
+  Rule : same scheme, but only ONE credit and a 6-cycle credit return.
+  Risk : the producer can only have one item in flight per credit round trip, which is longer
+         than the consumer's drain interval, so the FIFO runs dry.
+  Expect: 0 drops (still safe) but the consumer wastes slots: THROUGHPUT LOSS, not data loss.
+  narrating the first 16 cycles:
+RPT_WARNING @ 200 [BP] consumer wasted 25 slot(s) on an empty FIFO: the flow-control loop is too slow or under-provisioned
+RPT_INFO @ 200 [DEMO] RESULT after 200 cycles:
+    items sent            : 25
+    items accepted        : 25
+    items DROPPED (lost)  : 0   ok
+    items consumed        : 25 of 50 consumer slots (50% utilisation)
+    producer stall cycles : 175
+    consumer idle slots   : 25   <-- bubbles
+    peak FIFO occupancy   : 1/8
+RPT_INFO @ 200 [DEMO] 
+TAKEAWAY
+  NO BACKPRESSURE : overflow, data is lost.
+  LATE BACKPRESSURE: a stall that is only raised when the FIFO is full still overflows;
+                     the signal latency must be covered by headroom (watermarks) or credits.
+  TOO MUCH CAUTION: too few credits (or a watermark that is too low) never loses data but
+                     starves the consumer. Size the buffer for the round-trip latency:
+                     capacity >= flow-control latency + items needed to keep the consumer busy.
+
+--- RPT Report Summary ---
+** Report counts by severity
+RPT_INFO     : 14
+RPT_WARNING  : 3
+RPT_ERROR    : 2
+RPT_FATAL    : 0
+** Report counts by id
+[BP]        5
+[DEMO]      14

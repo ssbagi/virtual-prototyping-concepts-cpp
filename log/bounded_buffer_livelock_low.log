@@ -1,0 +1,85 @@
+// ============================================================================
+// Author  : Shreyas S Bagi
+// Note    : Developed with AI assistance (IBM Bob).
+// Purpose : Created for learning and knowledge purposes only.
+// ============================================================================
+RPT_INFO @ 0 [DEMO] 
+##########################################################################
+# BOUNDED BUFFER LIVELOCK DEMO  (model of the full-buffer deadlock)
+#
+#   q    = pending queue, oldest request first. A request leaves ONLY when it completes.
+#   buf  = bounded FIFO of request ids, capacity 4.
+#   port = ONE service per cycle (service port). A service pops buf.front().
+#
+# Start state: requests 4..7 already fill buf, the oldest requests
+# 0..3 are still waiting in q. Demand is constant: whenever a request completes, a new
+# younger one enters q.
+#
+# Each cycle every request in q is visited oldest-first, in order:
+#   not in buf -> try to insert; if buf is full the insert fails, but the request may
+#                 still burn the port to pop the front ('queue-only service');
+#   in buf     -> try the port; it completes only if buf.front() is ITS OWN entry.
+##########################################################################
+RPT_INFO @ 0 [DEMO] 
+==========================================================================
+ VARIANT: BUGGY (result dropped on queue-only service)
+==========================================================================
+  Behaviour : the queue-only service pops the front, but the result is thrown away.
+  Why bad   : the owner of the popped entry is not marked done and is not in buf, so it must
+              be inserted and serviced AGAIN - and the port is burned by the oldest request every
+              cycle before the owner gets its turn.
+  Expect    : LIVELOCK - everyone keeps trying, the port is busy every cycle, 0 completions.
+  narrating the first 6 cycles:
+RPT_WARNING @ 50 [BUF] LIVELOCK suspected: no request completed for 50 consecutive cycles (buf occupancy 4/4)
+RPT_ERROR @ 200 [BUF] oldest request (id 0) never completed in 200 cycles -> oldest request blocked -> DEADLOCK  [BUGGY (result dropped on queue-only service)]
+RPT_INFO @ 200 [DEMO] RESULT after 200 cycles:
+    completed requests        : 0
+    oldest request (id 0) : NEVER completed -> in-order completion stops -> DEADLOCK
+    peak buffer occupancy : 4/4
+RPT_INFO @ 0 [DEMO] 
+==========================================================================
+ VARIANT: RESULT_KEPT (no reserved slot)
+==========================================================================
+  Behaviour : the queue-only service pops the front AND remembers the result: the owner is
+              marked ready and completes on its next visit without needing the port.
+  Why better: no work is wasted, so the system moves.
+  Remaining : right after the oldest request's failed insert, younger requests refill the freed slot
+              (they are visited later in the same pass). The oldest request never finds a free
+              slot -> HEAD STARVATION. With in-order completion the whole system stalls again.
+  Expect    : many completions, but request 0 NEVER completes.
+  narrating the first 6 cycles:
+RPT_ERROR @ 200 [BUF] oldest request (id 0) never completed in 200 cycles -> oldest request blocked -> DEADLOCK  [RESULT_KEPT (no reserved slot)]
+RPT_INFO @ 200 [DEMO] RESULT after 200 cycles:
+    completed requests        : 200
+    oldest request (id 0) : NEVER completed -> in-order completion stops -> DEADLOCK
+    peak buffer occupancy : 4/4
+RPT_INFO @ 0 [DEMO] 
+==========================================================================
+ VARIANT: RESERVED_SLOT (fix)
+==========================================================================
+  Behaviour : result kept (as above) PLUS one slot is reserved for the oldest request. Every other
+              request may fill the buffer only up to capacity-1.
+  Why it works: the oldest request always has a free slot to enter, so it can never be starved by
+              younger requests; once it is in buf it is serviced in FIFO order.
+  Expect    : request 0 completes within a few cycles, then ~1 completion per cycle (1 port).
+  narrating the first 6 cycles:
+RPT_INFO @ 200 [DEMO] RESULT after 200 cycles:
+    completed requests        : 200
+    oldest request (id 0) : completed at cycle 5
+    peak buffer occupancy : 4/4
+RPT_INFO @ 200 [DEMO] 
+TAKEAWAY
+  LIVELOCK  : everybody is busy, nothing completes (work is done and thrown away).
+  STARVATION: the resource works, others progress, but the oldest requester never gets in.
+  FIX       : never waste a service (keep the result) AND guarantee the oldest requester
+              a slot (reserve one), so progress is guaranteed from the head of the queue.
+
+--- RPT Report Summary ---
+** Report counts by severity
+RPT_INFO     : 8
+RPT_WARNING  : 1
+RPT_ERROR    : 2
+RPT_FATAL    : 0
+** Report counts by id
+[BUF]       3
+[DEMO]      8
